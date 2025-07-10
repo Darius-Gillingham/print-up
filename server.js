@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: replace node-fetch with axios for proper multipart image upload to Printify
+// Commit: log detailed Printify 400 error message in uploadImageToPrintify
 
 import express from 'express';
 import cors from 'cors';
@@ -65,17 +65,20 @@ async function uploadImageToPrintify(filePath) {
     ...form.getHeaders()
   };
 
-  const response = await axios.post(
-    'https://api.printify.com/v1/uploads/images.json',
-    form,
-    { headers }
-  );
+  try {
+    const response = await axios.post(
+      'https://api.printify.com/v1/uploads/images.json',
+      form,
+      { headers }
+    );
 
-  if (response.status !== 200 || !response.data.id) {
-    throw new Error(`Printify image upload failed: ${JSON.stringify(response.data)}`);
+    return response.data.id;
+  } catch (err) {
+    if (err.response && err.response.data) {
+      console.error('✗ Printify upload rejected:', JSON.stringify(err.response.data, null, 2));
+    }
+    throw new Error(`Printify image upload failed: ${err.message}`);
   }
-
-  return response.data.id;
 }
 
 async function uploadNextImageToPrintify() {
