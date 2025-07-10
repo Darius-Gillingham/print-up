@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix FormData.toWellFormed crash by removing descriptor object and using filename string only
+// Commit: switch from undici to form-data to fix toWellFormed crash on Railway
 
 import express from 'express';
 import cors from 'cors';
@@ -9,9 +9,7 @@ import fs from 'fs/promises';
 import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import undici from 'undici';
-
-const { FormData, fetch: undiciFetch } = undici;
+import FormData from 'form-data';
 
 dotenv.config();
 
@@ -56,7 +54,6 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
-
   const form = new FormData();
 
   console.log('⛏️ Type of buffer:', typeof buffer);
@@ -70,12 +67,13 @@ async function uploadImageToPrintify(filePath) {
     throw err;
   }
 
-  const response = await undiciFetch(
+  const response = await fetch(
     'https://api.printify.com/v1/uploads/images.json',
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${printifyApiKey}`
+        Authorization: `Bearer ${printifyApiKey}`,
+        ...form.getHeaders()
       },
       body: form
     }
