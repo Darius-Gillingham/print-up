@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix FormData upload to Printify using raw buffer instead of custom File
+// Commit: fix undici FormData error by normalizing filename with String + NFC
 
 import express from 'express';
 import cors from 'cors';
@@ -60,7 +60,7 @@ async function uploadImageToPrintify(filePath) {
 
   const form = new FormData();
   form.append('file', buffer, {
-    filename,
+    filename: String(filename || 'upload.png').normalize('NFC'),
     contentType: 'image/png'
   });
 
