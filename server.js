@@ -1,6 +1,3 @@
-// File: print-up/server.js
-// Commit: fix Printify upload by forcing filename as third arg to form.append for correct multipart headers
-
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -10,7 +7,6 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
-import axios from 'axios';
 
 dotenv.config();
 
@@ -54,29 +50,32 @@ async function downloadImage(url, filename) {
 }
 
 async function uploadImageToPrintify(filePath) {
+  const buffer = await fs.readFile(filePath);
   const form = new FormData();
-  // Pass filename as third argument (string) to fix multipart headers for Printify
-  form.append('file', fssync.createReadStream(filePath), path.basename(filePath));
+  form.append('file', buffer, path.basename(filePath));
 
   const headers = {
     Authorization: `Bearer ${printifyApiKey}`,
     ...form.getHeaders()
   };
 
-  try {
-    const response = await axios.post(
-      'https://api.printify.com/v1/uploads/images.json',
-      form,
-      { headers }
-    );
-
-    return response.data.id;
-  } catch (err) {
-    if (err.response && err.response.data) {
-      console.error('✗ Printify upload rejected:', JSON.stringify(err.response.data, null, 2));
+  const response = await fetch(
+    'https://api.printify.com/v1/uploads/images.json',
+    {
+      method: 'POST',
+      headers,
+      body: form
     }
-    throw new Error(`Printify image upload failed: ${err.message}`);
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('✗ Printify upload rejected:', JSON.stringify(errorData, null, 2));
+    throw new Error(`Printify image upload failed: ${response.statusText}`);
   }
+
+  const data = await response.json();
+  return data.id;
 }
 
 async function uploadNextImageToPrintify() {
