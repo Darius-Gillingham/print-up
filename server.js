@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: add diagnostics to identify value.toWellFormed error source in FormData.append
+// Commit: fix FormData.toWellFormed crash by removing descriptor object and using filename string only
 
 import express from 'express';
 import cors from 'cors';
@@ -62,13 +62,9 @@ async function uploadImageToPrintify(filePath) {
   console.log('⛏️ Type of buffer:', typeof buffer);
   console.log('⛏️ Buffer isBuffer:', Buffer.isBuffer(buffer));
   console.log('⛏️ Filename:', 'upload.png');
-  console.log('⛏️ Content-Type:', 'image/png');
 
   try {
-    form.append('file', buffer, {
-      filename: 'upload.png',
-      contentType: 'image/png'
-    });
+    form.append('file', buffer, 'upload.png');
   } catch (err) {
     console.error('🧨 form.append crash:', err.stack || err);
     throw err;
