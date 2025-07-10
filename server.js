@@ -7,9 +7,10 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
-import Blob from 'fetch-blob';
+import blobPkg from 'fetch-blob';
 
 const { FormData, fetch: undiciFetch } = undici;
+const { Blob } = blobPkg;
 
 dotenv.config();
 
