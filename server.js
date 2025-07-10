@@ -1,3 +1,6 @@
+// File: server.js
+// Commit: fix FormData upload to Printify using raw buffer instead of custom File
+
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -9,42 +12,6 @@ import dotenv from 'dotenv';
 import undici from 'undici';
 
 const { FormData, fetch: undiciFetch } = undici;
-
-// 🧱 Patch String.prototype.toWellFormed if missing
-if (!String.prototype.toWellFormed) {
-  String.prototype.toWellFormed = function () {
-    return this.normalize('NFC');
-  };
-}
-
-class Blob {
-  constructor(parts, options = {}) {
-    this.buffer = Buffer.concat(parts.map(p => Buffer.from(p)));
-    this.type = String(options.type || 'application/octet-stream');
-    this.size = this.buffer.length;
-  }
-
-  stream() {
-    const { Readable } = require('stream');
-    return Readable.from(this.buffer);
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'Blob';
-  }
-}
-
-class File extends Blob {
-  constructor(parts, name, options = {}) {
-    super(parts, options);
-    this.name = name;
-    this.lastModified = options.lastModified || Date.now();
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'File';
-  }
-}
 
 dotenv.config();
 
@@ -90,10 +57,12 @@ async function downloadImage(url, filename) {
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
   const filename = path.basename(filePath);
-  const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file, filename); // ✅ force filename into multipart
+  form.append('file', buffer, {
+    filename,
+    contentType: 'image/png'
+  });
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
