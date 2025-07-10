@@ -1,6 +1,3 @@
-// File: server.js
-// Commit: switch from FormData to base64 JSON upload for Printify
-
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -11,7 +8,16 @@ import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
 
-const { fetch: undiciFetch } = undici;
+const { FormData, File, Blob, fetch: undiciFetch } = undici;
+
+// 🧱 Patch String.prototype.toWellFormed if missing
+if (!String.prototype.toWellFormed) {
+  String.prototype.toWellFormed = function () {
+    return this.normalize('NFC');
+  };
+}
+
+// 🧱 Removed custom Blob and File constructors
 
 dotenv.config();
 
@@ -56,21 +62,20 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
-  const base64 = buffer.toString('base64');
   const filename = path.basename(filePath);
+  const file = new File([buffer], filename, { type: 'image/png' });
+
+  const form = new FormData();
+  form.append('file', file, filename);
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${printifyApiKey}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${printifyApiKey}`
       },
-      body: JSON.stringify({
-        file_name: filename,
-        contents: base64
-      })
+      body: form
     }
   );
 
