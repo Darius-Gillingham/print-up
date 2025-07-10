@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: port Supabase query pattern from working serverE.js
+// Commit: fix "Invalid character in header content" by trimming Printify API key
 
 import express from 'express';
 import cors from 'cors';
@@ -28,9 +28,9 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE || !PRINTIFY_API_KEY || !PRINTIFY_SH
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
-
-const productId = 5;      // Replace with your actual blueprint ID
-const variantId = 40156;  // Replace with your actual variant ID
+const printifyApiKey = PRINTIFY_API_KEY.trim();
+const productId = 5;
+const variantId = 40156;
 
 async function uploadNextImageToPrintify() {
   console.log('🔁 Polling Supabase for unprocessed image...');
@@ -63,7 +63,7 @@ async function uploadNextImageToPrintify() {
     const response = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/products.json`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
+        'Authorization': `Bearer ${printifyApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
