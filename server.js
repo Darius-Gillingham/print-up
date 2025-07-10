@@ -7,10 +7,37 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
-import blobPkg from 'fetch-blob';
 
 const { FormData, fetch: undiciFetch } = undici;
-const { Blob } = blobPkg;
+
+class Blob {
+  constructor(parts, options = {}) {
+    this.buffer = Buffer.concat(parts.map(p => Buffer.from(p)));
+    this.type = options.type || 'application/octet-stream';
+    this.size = this.buffer.length;
+  }
+
+  stream() {
+    const { Readable } = require('stream');
+    return Readable.from(this.buffer);
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'Blob';
+  }
+}
+
+class File extends Blob {
+  constructor(parts, name, options = {}) {
+    super(parts, options);
+    this.name = name;
+    this.lastModified = options.lastModified || Date.now();
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'File';
+  }
+}
 
 dotenv.config();
 
@@ -56,10 +83,10 @@ async function downloadImage(url, filename) {
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
   const filename = path.basename(filePath);
-  const blob = new Blob([buffer], { type: 'image/png' });
+  const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', blob, filename);
+  form.append('file', file);
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
