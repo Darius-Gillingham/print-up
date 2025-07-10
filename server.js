@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: switch from undici to form-data to fix toWellFormed crash on Railway
+// Commit: fix Printify validation error by explicitly setting filename and contentType in form-data
 
 import express from 'express';
 import cors from 'cors';
@@ -61,7 +61,10 @@ async function uploadImageToPrintify(filePath) {
   console.log('⛏️ Filename:', 'upload.png');
 
   try {
-    form.append('file', buffer, 'upload.png');
+    form.append('file', buffer, {
+      filename: 'upload.png',
+      contentType: 'image/png'
+    });
   } catch (err) {
     console.error('🧨 form.append crash:', err.stack || err);
     throw err;
