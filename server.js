@@ -82,8 +82,8 @@ async function downloadImage(url, filename) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
   const filePath = path.join(TEMP_DIR, filename);
-  const buffer = await res.buffer();
-  await fs.writeFile(filePath, buffer);
+  const buffer = await res.arrayBuffer();
+  await fs.writeFile(filePath, Buffer.from(buffer));
   return filePath;
 }
 
@@ -93,7 +93,7 @@ async function uploadImageToPrintify(filePath) {
   const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', file, filename); // ✅ force filename into multipart
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
