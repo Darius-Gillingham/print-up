@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: simplify FormData file upload with fixed static filename to avoid toWellFormed errors
+// Commit: add diagnostics to identify value.toWellFormed error source in FormData.append
 
 import express from 'express';
 import cors from 'cors';
@@ -58,10 +58,21 @@ async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
 
   const form = new FormData();
-  form.append('file', buffer, {
-    filename: 'upload.png',
-    contentType: 'image/png'
-  });
+
+  console.log('⛏️ Type of buffer:', typeof buffer);
+  console.log('⛏️ Buffer isBuffer:', Buffer.isBuffer(buffer));
+  console.log('⛏️ Filename:', 'upload.png');
+  console.log('⛏️ Content-Type:', 'image/png');
+
+  try {
+    form.append('file', buffer, {
+      filename: 'upload.png',
+      contentType: 'image/png'
+    });
+  } catch (err) {
+    console.error('🧨 form.append crash:', err.stack || err);
+    throw err;
+  }
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
