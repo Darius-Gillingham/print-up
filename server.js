@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: fix Printify validation error by explicitly setting filename and contentType in form-data stream
+// Commit: replace node-fetch with axios for proper multipart image upload to Printify
 
 import express from 'express';
 import cors from 'cors';
@@ -10,6 +10,7 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -59,22 +60,22 @@ async function uploadImageToPrintify(filePath) {
     contentType: 'image/png'
   });
 
-  const response = await fetch('https://api.printify.com/v1/uploads/images.json', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${printifyApiKey}`,
-      ...form.getHeaders()
-    },
-    body: form
-  });
+  const headers = {
+    Authorization: `Bearer ${printifyApiKey}`,
+    ...form.getHeaders()
+  };
 
-  const result = await response.json();
+  const response = await axios.post(
+    'https://api.printify.com/v1/uploads/images.json',
+    form,
+    { headers }
+  );
 
-  if (!response.ok) {
-    throw new Error(`Printify image upload failed: ${JSON.stringify(result)}`);
+  if (response.status !== 200 || !response.data.id) {
+    throw new Error(`Printify image upload failed: ${JSON.stringify(response.data)}`);
   }
 
-  return result.id;
+  return response.data.id;
 }
 
 async function uploadNextImageToPrintify() {
