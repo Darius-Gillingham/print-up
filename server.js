@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: fix Printify 400 error by adding required image.id field ("preview")
+// Commit: add pre-upload URL accessibility check to catch Supabase access issues
 
 import express from 'express';
 import cors from 'cors';
@@ -59,6 +59,13 @@ async function uploadNextImageToPrintify() {
     const title = `Auto Product: ${filename.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
 
     console.log(`📤 Uploading "${title}" using image: ${imageUrl}`);
+
+    // ⛔ Check image URL accessibility before uploading to Printify
+    const imageCheck = await fetch(imageUrl);
+    if (!imageCheck.ok) {
+      console.error(`✗ Image URL not accessible [${imageCheck.status}]: ${imageUrl}`);
+      return;
+    }
 
     const response = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/products.json`, {
       method: 'POST',
