@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix undici FormData error by normalizing filename with String + NFC
+// Commit: simplify FormData file upload with fixed static filename to avoid toWellFormed errors
 
 import express from 'express';
 import cors from 'cors';
@@ -56,11 +56,10 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
-  const filename = path.basename(filePath);
 
   const form = new FormData();
   form.append('file', buffer, {
-    filename: String(filename || 'upload.png').normalize('NFC'),
+    filename: 'upload.png',
     contentType: 'image/png'
   });
 
