@@ -7,44 +7,11 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
+import { createRequire } from 'module';
 
 const { FormData, fetch: undiciFetch } = undici;
-
-// 🧱 Patch String.prototype.toWellFormed if missing
-if (!String.prototype.toWellFormed) {
-  String.prototype.toWellFormed = function () {
-    return this.normalize('NFC');
-  };
-}
-
-class Blob {
-  constructor(parts, options = {}) {
-    this.buffer = Buffer.concat(parts.map(p => Buffer.from(p)));
-    this.type = String(options.type || 'application/octet-stream');
-    this.size = this.buffer.length;
-  }
-
-  stream() {
-    const { Readable } = require('stream');
-    return Readable.from(this.buffer);
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'Blob';
-  }
-}
-
-class File extends Blob {
-  constructor(parts, name, options = {}) {
-    super(parts, options);
-    this.name = name;
-    this.lastModified = options.lastModified || Date.now();
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'File';
-  }
-}
+const require = createRequire(import.meta.url);
+const { File } = require('fetch-blob');
 
 dotenv.config();
 
@@ -93,7 +60,7 @@ async function uploadImageToPrintify(filePath) {
   const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file, filename); // ✅ force filename into multipart
+  form.append('file', file, filename); // required for multipart correctness
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
