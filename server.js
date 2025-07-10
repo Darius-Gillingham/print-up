@@ -7,11 +7,10 @@ import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
-import { createRequire } from 'module';
+import fetchBlob from 'fetch-blob';
 
 const { FormData, fetch: undiciFetch } = undici;
-const require = createRequire(import.meta.url);
-const { File } = require('fetch-blob');
+const { File } = fetchBlob;
 
 dotenv.config();
 
@@ -60,7 +59,7 @@ async function uploadImageToPrintify(filePath) {
   const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file, filename); // required for multipart correctness
+  form.append('file', file, filename);
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
