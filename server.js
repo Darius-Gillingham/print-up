@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: fix Printify upload error by switching from buffer to file stream in FormData
+// Commit: fix Printify validation error by explicitly setting filename and contentType in form-data stream
 
 import express from 'express';
 import cors from 'cors';
@@ -54,7 +54,10 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const form = new FormData();
-  form.append('file', fssync.createReadStream(filePath));
+  form.append('file', fssync.createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: 'image/png'
+  });
 
   const response = await fetch('https://api.printify.com/v1/uploads/images.json', {
     method: 'POST',
