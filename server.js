@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import FormData from 'form-data';
+import { File, FormData, fetch as undiciFetch } from 'undici';
 
 dotenv.config();
 
@@ -51,19 +51,19 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
+  const filename = path.basename(filePath);
+  const file = new File([buffer], filename, { type: 'image/png' });
+
   const form = new FormData();
-  form.append('file', buffer, path.basename(filePath));
+  form.append('file', file);
 
-  const headers = {
-    Authorization: `Bearer ${printifyApiKey}`,
-    ...form.getHeaders()
-  };
-
-  const response = await fetch(
+  const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
     {
       method: 'POST',
-      headers,
+      headers: {
+        Authorization: `Bearer ${printifyApiKey}`
+      },
       body: form
     }
   );
