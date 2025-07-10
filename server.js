@@ -1,5 +1,5 @@
-// File: s5/serverPrintify.js
-// Commit: integrate Printify API and switch to port 8081
+// File: s5/server.js
+// Commit: send Supabase image to Printify with filename-derived auto title
 
 import express from 'express';
 import cors from 'cors';
@@ -31,7 +31,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
 app.get('/api/send-to-printify', async (req, res) => {
   try {
-    // Step 1: Pull one recent image from Supabase
+    // Step 1: Pull the most recent image
     const { data, error } = await supabase
       .from('image_index')
       .select('path')
@@ -40,11 +40,16 @@ app.get('/api/send-to-printify', async (req, res) => {
 
     if (error || !data || data.length === 0) throw new Error('No image found');
 
-    const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/generated-images/${data[0].path}`;
+    const imagePath = data[0].path;
+    const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/generated-images/${imagePath}`;
 
-    // Step 2: Send to Printify as a product (you can replace IDs with real ones)
-    const productId = 5;      // example: unisex t-shirt
-    const variantId = 40156;  // example: small / black
+    // Step 2: Generate title from file name
+    const filename = imagePath.split('/').pop().replace(/\.[^/.]+$/, '');
+    const title = `Auto Product: ${filename.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+
+    // Step 3: Send to Printify
+    const productId = 5;      // placeholder blueprint ID
+    const variantId = 40156;  // placeholder variant ID
 
     const response = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/products.json`, {
       method: 'POST',
@@ -53,8 +58,8 @@ app.get('/api/send-to-printify', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        title: "Auto-generated product",
-        description: "Uploaded via Supabase-Printify integration",
+        title,
+        description: "Auto-generated product from Supabase",
         blueprint_id: productId,
         variants: [
           {
@@ -91,6 +96,7 @@ app.get('/api/send-to-printify', async (req, res) => {
       throw new Error(`Printify error: ${JSON.stringify(result)}`);
     }
 
+    console.log(`✓ Uploaded to Printify as "${title}"`);
     res.json({ success: true, product: result });
   } catch (err) {
     console.error('✗ Error sending image to Printify:', err.message);
@@ -103,5 +109,5 @@ app.get('/health', (_, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`✓ serverPrintify listening on port ${port}`);
+  console.log(`✓ server.js listening on port ${port}`);
 });
