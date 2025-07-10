@@ -10,10 +10,17 @@ import undici from 'undici';
 
 const { FormData, fetch: undiciFetch } = undici;
 
+// 🧱 Patch String.prototype.toWellFormed if missing
+if (!String.prototype.toWellFormed) {
+  String.prototype.toWellFormed = function () {
+    return this.normalize('NFC');
+  };
+}
+
 class Blob {
   constructor(parts, options = {}) {
     this.buffer = Buffer.concat(parts.map(p => Buffer.from(p)));
-    this.type = options.type || 'application/octet-stream';
+    this.type = String(options.type || 'application/octet-stream');
     this.size = this.buffer.length;
   }
 
