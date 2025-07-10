@@ -8,7 +8,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
 
-const { FormData, File, Blob, fetch: undiciFetch } = undici;
+const { FormData, fetch: undiciFetch } = undici;
 
 // 🧱 Patch String.prototype.toWellFormed if missing
 if (!String.prototype.toWellFormed) {
@@ -17,7 +17,34 @@ if (!String.prototype.toWellFormed) {
   };
 }
 
-// 🧱 Removed custom Blob and File constructors
+class Blob {
+  constructor(parts, options = {}) {
+    this.buffer = Buffer.concat(parts.map(p => Buffer.from(p)));
+    this.type = String(options.type || 'application/octet-stream');
+    this.size = this.buffer.length;
+  }
+
+  stream() {
+    const { Readable } = require('stream');
+    return Readable.from(this.buffer);
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'Blob';
+  }
+}
+
+class File extends Blob {
+  constructor(parts, name, options = {}) {
+    super(parts, options);
+    this.name = name;
+    this.lastModified = options.lastModified || Date.now();
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'File';
+  }
+}
 
 dotenv.config();
 
@@ -66,7 +93,7 @@ async function uploadImageToPrintify(filePath) {
   const file = new File([buffer], filename, { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file, filename);
+  form.append('file', file, filename); // ✅ force filename into multipart
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
