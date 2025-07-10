@@ -1,11 +1,12 @@
 // File: print-up/server.js
-// Commit: download Supabase image locally, upload to Printify via image upload endpoint, cleanup after
+// Commit: fix Printify upload error by switching from buffer to file stream in FormData
 
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
+import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
@@ -53,10 +54,7 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const form = new FormData();
-  form.append('file', await fs.readFile(filePath), {
-    filename: path.basename(filePath),
-    contentType: 'image/png'
-  });
+  form.append('file', fssync.createReadStream(filePath));
 
   const response = await fetch('https://api.printify.com/v1/uploads/images.json', {
     method: 'POST',
