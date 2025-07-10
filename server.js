@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: fix "Invalid character in header content" by trimming Printify API key
+// Commit: fix Printify 400 error by adding required image.id field ("preview")
 
 import express from 'express';
 import cors from 'cors';
@@ -85,6 +85,7 @@ async function uploadNextImageToPrintify() {
                 position: "front",
                 images: [
                   {
+                    id: "preview",
                     src: imageUrl,
                     x: 0.5,
                     y: 0.5,
