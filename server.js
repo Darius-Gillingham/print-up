@@ -1,11 +1,14 @@
 // File: print-up/server.js
-// Commit: add pre-upload URL accessibility check to catch Supabase access issues
+// Commit: download Supabase image locally, upload to Printify via image upload endpoint, cleanup after
 
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
+import fs from 'fs/promises';
+import path from 'path';
 import dotenv from 'dotenv';
+import FormData from 'form-data';
 
 dotenv.config();
 
@@ -31,6 +34,47 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 const printifyApiKey = PRINTIFY_API_KEY.trim();
 const productId = 5;
 const variantId = 40156;
+const TEMP_DIR = './tmp';
+
+async function ensureTempDir() {
+  try {
+    await fs.mkdir(TEMP_DIR);
+  } catch (_) {}
+}
+
+async function downloadImage(url, filename) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
+  const filePath = path.join(TEMP_DIR, filename);
+  const buffer = await res.buffer();
+  await fs.writeFile(filePath, buffer);
+  return filePath;
+}
+
+async function uploadImageToPrintify(filePath) {
+  const form = new FormData();
+  form.append('file', await fs.readFile(filePath), {
+    filename: path.basename(filePath),
+    contentType: 'image/png'
+  });
+
+  const response = await fetch('https://api.printify.com/v1/uploads/images.json', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${printifyApiKey}`,
+      ...form.getHeaders()
+    },
+    body: form
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`Printify image upload failed: ${JSON.stringify(result)}`);
+  }
+
+  return result.id;
+}
 
 async function uploadNextImageToPrintify() {
   console.log('🔁 Polling Supabase for unprocessed image...');
@@ -55,19 +99,20 @@ async function uploadNextImageToPrintify() {
 
     const image = data[0];
     const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/generated-images/${image.path}`;
-    const filename = image.path.split('/').pop().replace(/\.[^/.]+$/, '');
-    const title = `Auto Product: ${filename.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+    const filename = image.path.split('/').pop();
+    const title = `Auto Product: ${filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+    const localPath = path.join(TEMP_DIR, filename);
 
-    console.log(`📤 Uploading "${title}" using image: ${imageUrl}`);
+    console.log(`⬇️  Downloading image: ${imageUrl}`);
+    await ensureTempDir();
+    const filePath = await downloadImage(imageUrl, filename);
 
-    // ⛔ Check image URL accessibility before uploading to Printify
-    const imageCheck = await fetch(imageUrl);
-    if (!imageCheck.ok) {
-      console.error(`✗ Image URL not accessible [${imageCheck.status}]: ${imageUrl}`);
-      return;
-    }
+    console.log(`☁️  Uploading to Printify from: ${filePath}`);
+    const printifyImageId = await uploadImageToPrintify(filePath);
 
-    const response = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/products.json`, {
+    console.log(`📦 Creating product "${title}" with image_id: ${printifyImageId}`);
+
+    const createResponse = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/products.json`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${printifyApiKey}`,
@@ -92,12 +137,7 @@ async function uploadNextImageToPrintify() {
                 position: "front",
                 images: [
                   {
-                    id: "preview",
-                    src: imageUrl,
-                    x: 0.5,
-                    y: 0.5,
-                    scale: 1.0,
-                    angle: 0
+                    id: printifyImageId
                   }
                 ]
               }
@@ -107,14 +147,17 @@ async function uploadNextImageToPrintify() {
       })
     });
 
-    const result = await response.json();
+    const result = await createResponse.json();
 
-    if (!response.ok) {
-      console.error(`✗ Printify error [${response.status}]:`, JSON.stringify(result, null, 2));
+    if (!createResponse.ok) {
+      console.error(`✗ Printify product creation error [${createResponse.status}]:`, JSON.stringify(result, null, 2));
       return;
     }
 
     console.log(`✓ Uploaded "${title}" → product_id: ${result.id}`);
+
+    await fs.unlink(filePath);
+    console.log(`🗑️  Deleted local file: ${filePath}`);
 
     const { error: updateError } = await supabase
       .from('image_index')
@@ -127,7 +170,7 @@ async function uploadNextImageToPrintify() {
       console.log(`✅ Marked image ID ${image.id} as uploaded.`);
     }
   } catch (err) {
-    console.error('✗ Upload failed with exception:', err.message);
+    console.error('✗ Pipeline error:', err.message);
   }
 }
 
