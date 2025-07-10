@@ -8,7 +8,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import undici from 'undici';
 
-const { File, FormData, fetch: undiciFetch } = undici;
+const { Blob, FormData, fetch: undiciFetch } = undici;
 
 dotenv.config();
 
@@ -54,10 +54,10 @@ async function downloadImage(url, filename) {
 async function uploadImageToPrintify(filePath) {
   const buffer = await fs.readFile(filePath);
   const filename = path.basename(filePath);
-  const file = new File([buffer], filename, { type: 'image/png' });
+  const blob = new Blob([buffer], { type: 'image/png' });
 
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', blob, filename);
 
   const response = await undiciFetch(
     'https://api.printify.com/v1/uploads/images.json',
