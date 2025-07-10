@@ -1,5 +1,5 @@
 // File: print-up/server.js
-// Commit: log detailed Printify 400 error message in uploadImageToPrintify
+// Commit: fix Printify upload by forcing filename as third arg to form.append for correct multipart headers
 
 import express from 'express';
 import cors from 'cors';
@@ -55,10 +55,8 @@ async function downloadImage(url, filename) {
 
 async function uploadImageToPrintify(filePath) {
   const form = new FormData();
-  form.append('file', fssync.createReadStream(filePath), {
-    filename: path.basename(filePath),
-    contentType: 'image/png'
-  });
+  // Pass filename as third argument (string) to fix multipart headers for Printify
+  form.append('file', fssync.createReadStream(filePath), path.basename(filePath));
 
   const headers = {
     Authorization: `Bearer ${printifyApiKey}`,
