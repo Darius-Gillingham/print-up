@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node serverE.js"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "Darius Gillingham",
