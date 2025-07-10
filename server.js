@@ -6,7 +6,9 @@ import fs from 'fs/promises';
 import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { File, FormData, fetch as undiciFetch } from 'undici';
+import undici from 'undici';
+
+const { File, FormData, fetch: undiciFetch } = undici;
 
 dotenv.config();
 
