@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify URL upload and prevent validation errors
+// Commit: dynamically scan blueprints to find first valid provider and variant for Printify
 
 import express from 'express';
 import cors from 'cors';
@@ -30,30 +30,43 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE || !PRINTIFY_API_KEY || !PRINTIFY_SH
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 const printifyApiKey = PRINTIFY_API_KEY.trim();
-let productId = 5;
+let blueprintId = null;
 let providerId = null;
 let variantId = null;
 
-async function fetchProviderAndVariantForBlueprint(blueprintId) {
-  const providerRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers.json`, {
+async function findFirstValidBlueprintSetup() {
+  const blueprintRes = await fetch(`https://api.printify.com/v1/catalog/blueprints.json`, {
     headers: { Authorization: `Bearer ${printifyApiKey}` }
   });
 
-  if (!providerRes.ok) throw new Error(`Provider fetch failed: ${providerRes.statusText}`);
-  const providers = await providerRes.json();
-  const provider = providers?.[0];
-  if (!provider) throw new Error('No print providers found for blueprint');
+  if (!blueprintRes.ok) throw new Error(`Blueprint fetch failed: ${blueprintRes.statusText}`);
+  const blueprints = await blueprintRes.json();
 
-  const variantRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers/${provider.id}/variants.json`, {
-    headers: { Authorization: `Bearer ${printifyApiKey}` }
-  });
+  for (const blueprint of blueprints) {
+    const providerRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprint.id}/print_providers.json`, {
+      headers: { Authorization: `Bearer ${printifyApiKey}` }
+    });
+    if (!providerRes.ok) continue;
+    const providers = await providerRes.json();
+    const provider = providers?.[0];
+    if (!provider) continue;
 
-  if (!variantRes.ok) throw new Error(`Variant fetch failed: ${variantRes.statusText}`);
-  const variants = await variantRes.json();
-  const variant = variants?.[0];
-  if (!variant) throw new Error('No variants found for blueprint/provider');
+    const variantRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprint.id}/print_providers/${provider.id}/variants.json`, {
+      headers: { Authorization: `Bearer ${printifyApiKey}` }
+    });
+    if (!variantRes.ok) continue;
+    const variants = await variantRes.json();
+    const variant = variants?.[0];
+    if (!variant) continue;
 
-  return { providerId: provider.id, variantId: variant.id };
+    blueprintId = blueprint.id;
+    providerId = provider.id;
+    variantId = variant.id;
+    console.log(`📦 Found valid setup → blueprint: ${blueprintId}, provider: ${providerId}, variant: ${variantId}`);
+    return;
+  }
+
+  throw new Error('❌ No valid blueprint + provider + variant combo found');
 }
 
 async function uploadImageToPrintifyByUrl(publicUrl, fileName) {
@@ -68,22 +81,20 @@ async function uploadImageToPrintifyByUrl(publicUrl, fileName) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        file_name: fileName,
-        url: publicUrl
+        url: publicUrl,
+        file_name: fileName
       })
     }
   );
 
-  const result = await response.json();
-
   if (!response.ok) {
-    console.error('✗ Printify upload rejected:', JSON.stringify(result, null, 2));
+    const errorData = await response.json();
+    console.error('✗ Printify upload rejected:', JSON.stringify(errorData, null, 2));
     throw new Error(`Printify image upload failed: ${response.statusText}`);
   }
 
-  if (!result.id) throw new Error('No image_id returned from Printify');
-
-  return result.id;
+  const data = await response.json();
+  return data.id;
 }
 
 async function uploadNextImageToPrintify() {
@@ -115,20 +126,8 @@ async function uploadNextImageToPrintify() {
     console.log(`⬇️  Supabase public image URL: ${imageUrl}`);
     const printifyImageId = await uploadImageToPrintifyByUrl(imageUrl, filename);
 
-    if (!providerId || !variantId) {
-      try {
-        const result = await fetchProviderAndVariantForBlueprint(productId);
-        providerId = result.providerId;
-        variantId = result.variantId;
-        console.log(`📦 Selected provider: ${providerId}, variant: ${variantId}`);
-      } catch (fallbackErr) {
-        console.error('✗ Provider/variant fetch failed, trying fallback blueprint 1');
-        const result = await fetchProviderAndVariantForBlueprint(1);
-        productId = 1;
-        providerId = result.providerId;
-        variantId = result.variantId;
-        console.log(`📦 Fallback provider: ${providerId}, variant: ${variantId}`);
-      }
+    if (!providerId || !variantId || !blueprintId) {
+      await findFirstValidBlueprintSetup();
     }
 
     console.log(`📦 Creating product "${title}" with image_id: ${printifyImageId}`);
@@ -142,7 +141,7 @@ async function uploadNextImageToPrintify() {
       body: JSON.stringify({
         title,
         description: "Auto-generated product from Supabase",
-        blueprint_id: productId,
+        blueprint_id: blueprintId,
         print_provider_id: providerId,
         variants: [
           {
