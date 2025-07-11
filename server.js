@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify upload by using Buffer and correct multipart field key "file"
+// Commit: switch to Printify image upload via public Supabase URL instead of multipart upload
 
 import express from 'express';
 import cors from 'cors';
@@ -8,7 +8,6 @@ import fetch from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
-import FormData from 'form-data';
 
 dotenv.config();
 
@@ -34,38 +33,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 const printifyApiKey = PRINTIFY_API_KEY.trim();
 const productId = 5;
 const variantId = 40156;
-const TEMP_DIR = './tmp';
 
-async function ensureTempDir() {
-  try {
-    await fs.mkdir(TEMP_DIR);
-  } catch (_) {}
-}
-
-async function downloadImage(url, filename) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
-  const filePath = path.join(TEMP_DIR, filename);
-  const buffer = await res.arrayBuffer();
-  await fs.writeFile(filePath, Buffer.from(buffer));
-  return filePath;
-}
-
-async function uploadImageToPrintify(filePath) {
-  const buffer = await fs.readFile(filePath);
-  const form = new FormData();
-
-  console.log('⛏️ Using raw buffer upload for:', filePath);
-
-  try {
-    form.append('file', buffer, {
-      filename: 'upload.png',
-      contentType: 'image/png'
-    });
-  } catch (err) {
-    console.error('🧨 form.append crash:', err.stack || err);
-    throw err;
-  }
+async function uploadImageToPrintifyByUrl(publicUrl) {
+  console.log(`🌐 Uploading to Printify via URL: ${publicUrl}`);
 
   const response = await fetch(
     'https://api.printify.com/v1/uploads/images.json',
@@ -73,9 +43,9 @@ async function uploadImageToPrintify(filePath) {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${printifyApiKey}`,
-        ...form.getHeaders()
+        'Content-Type': 'application/json'
       },
-      body: form
+      body: JSON.stringify({ url: publicUrl })
     }
   );
 
@@ -114,14 +84,9 @@ async function uploadNextImageToPrintify() {
     const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/generated-images/${image.path}`;
     const filename = image.path.split('/').pop();
     const title = `Auto Product: ${filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
-    const localPath = path.join(TEMP_DIR, filename);
 
-    console.log(`⬇️  Downloading image: ${imageUrl}`);
-    await ensureTempDir();
-    const filePath = await downloadImage(imageUrl, filename);
-
-    console.log(`☁️  Uploading to Printify from: ${filePath}`);
-    const printifyImageId = await uploadImageToPrintify(filePath);
+    console.log(`⬇️  Supabase public image URL: ${imageUrl}`);
+    const printifyImageId = await uploadImageToPrintifyByUrl(imageUrl);
 
     console.log(`📦 Creating product "${title}" with image_id: ${printifyImageId}`);
 
@@ -168,9 +133,6 @@ async function uploadNextImageToPrintify() {
     }
 
     console.log(`✓ Uploaded "${title}" → product_id: ${result.id}`);
-
-    await fs.unlink(filePath);
-    console.log(`🗑️  Deleted local file: ${filePath}`);
 
     const { error: updateError } = await supabase
       .from('image_index')
