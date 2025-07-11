@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify validation error by explicitly setting filename and contentType in form-data
+// Commit: fix Printify upload by replacing Buffer with fs.createReadStream in form-data
 
 import express from 'express';
 import cors from 'cors';
@@ -53,15 +53,13 @@ async function downloadImage(url, filename) {
 }
 
 async function uploadImageToPrintify(filePath) {
-  const buffer = await fs.readFile(filePath);
+  const fileStream = fssync.createReadStream(filePath);
   const form = new FormData();
 
-  console.log('⛏️ Type of buffer:', typeof buffer);
-  console.log('⛏️ Buffer isBuffer:', Buffer.isBuffer(buffer));
-  console.log('⛏️ Filename:', 'upload.png');
+  console.log('⛏️ Using fs.createReadStream for:', filePath);
 
   try {
-    form.append('file', buffer, {
+    form.append('file', fileStream, {
       filename: 'upload.png',
       contentType: 'image/png'
     });
