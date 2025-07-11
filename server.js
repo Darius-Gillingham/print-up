@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: patch Printify upload with manual { value, options } form-data syntax to ensure file is accepted
+// Commit: revert to valid form-data stream syntax using direct append with stream and options
 
 import express from 'express';
 import cors from 'cors';
@@ -59,12 +59,9 @@ async function uploadImageToPrintify(filePath) {
   console.log('⛏️ Preparing Printify upload from stream:', filePath);
 
   try {
-    form.append('image', {
-      value: fileStream,
-      options: {
-        filename: 'upload.png',
-        contentType: 'image/png'
-      }
+    form.append('image', fileStream, {
+      filename: 'upload.png',
+      contentType: 'image/png'
     });
   } catch (err) {
     console.error('🧨 form.append crash:', err.stack || err);
