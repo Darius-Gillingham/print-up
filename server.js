@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify upload by replacing Buffer with fs.createReadStream in form-data
+// Commit: fix Printify upload by changing multipart field name from "file" to "image"
 
 import express from 'express';
 import cors from 'cors';
@@ -59,7 +59,7 @@ async function uploadImageToPrintify(filePath) {
   console.log('⛏️ Using fs.createReadStream for:', filePath);
 
   try {
-    form.append('file', fileStream, {
+    form.append('image', fileStream, {
       filename: 'upload.png',
       contentType: 'image/png'
     });
