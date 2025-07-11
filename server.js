@@ -1,11 +1,10 @@
 // File: server.js
-// Commit: switch to Printify image upload via public Supabase URL instead of multipart upload
+// Commit: fix Printify upload via URL by including required file_name field
 
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
-import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
 
@@ -34,7 +33,7 @@ const printifyApiKey = PRINTIFY_API_KEY.trim();
 const productId = 5;
 const variantId = 40156;
 
-async function uploadImageToPrintifyByUrl(publicUrl) {
+async function uploadImageToPrintifyByUrl(publicUrl, fileName) {
   console.log(`🌐 Uploading to Printify via URL: ${publicUrl}`);
 
   const response = await fetch(
@@ -45,7 +44,10 @@ async function uploadImageToPrintifyByUrl(publicUrl) {
         Authorization: `Bearer ${printifyApiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ url: publicUrl })
+      body: JSON.stringify({
+        url: publicUrl,
+        file_name: fileName
+      })
     }
   );
 
@@ -82,11 +84,11 @@ async function uploadNextImageToPrintify() {
 
     const image = data[0];
     const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/generated-images/${image.path}`;
-    const filename = image.path.split('/').pop();
+    const filename = image.path.split('/').pop() || 'upload.png';
     const title = `Auto Product: ${filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
 
     console.log(`⬇️  Supabase public image URL: ${imageUrl}`);
-    const printifyImageId = await uploadImageToPrintifyByUrl(imageUrl);
+    const printifyImageId = await uploadImageToPrintifyByUrl(imageUrl, filename);
 
     console.log(`📦 Creating product "${title}" with image_id: ${printifyImageId}`);
 
