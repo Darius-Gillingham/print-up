@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify upload by changing multipart field name from "file" to "image"
+// Commit: patch Printify upload with manual { value, options } form-data syntax to ensure file is accepted
 
 import express from 'express';
 import cors from 'cors';
@@ -56,12 +56,15 @@ async function uploadImageToPrintify(filePath) {
   const fileStream = fssync.createReadStream(filePath);
   const form = new FormData();
 
-  console.log('⛏️ Using fs.createReadStream for:', filePath);
+  console.log('⛏️ Preparing Printify upload from stream:', filePath);
 
   try {
-    form.append('image', fileStream, {
-      filename: 'upload.png',
-      contentType: 'image/png'
+    form.append('image', {
+      value: fileStream,
+      options: {
+        filename: 'upload.png',
+        contentType: 'image/png'
+      }
     });
   } catch (err) {
     console.error('🧨 form.append crash:', err.stack || err);
