@@ -1,12 +1,11 @@
 // File: server.js
-// Commit: revert to valid form-data stream syntax using direct append with stream and options
+// Commit: fix Printify upload by using Buffer and correct multipart field key "file"
 
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
-import fssync from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
@@ -53,13 +52,13 @@ async function downloadImage(url, filename) {
 }
 
 async function uploadImageToPrintify(filePath) {
-  const fileStream = fssync.createReadStream(filePath);
+  const buffer = await fs.readFile(filePath);
   const form = new FormData();
 
-  console.log('⛏️ Preparing Printify upload from stream:', filePath);
+  console.log('⛏️ Using raw buffer upload for:', filePath);
 
   try {
-    form.append('image', fileStream, {
+    form.append('file', buffer, {
       filename: 'upload.png',
       contentType: 'image/png'
     });
