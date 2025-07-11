@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: add required x, y, scale, and angle fields for Printify print_area image placement
+// Commit: add missing print_provider_id to fix Printify product creation error
 
 import express from 'express';
 import cors from 'cors';
@@ -32,6 +32,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 const printifyApiKey = PRINTIFY_API_KEY.trim();
 const productId = 5;
 const variantId = 40156;
+const providerId = 1; // Printify Premium
 
 async function uploadImageToPrintifyByUrl(publicUrl, fileName) {
   console.log(`🌐 Uploading to Printify via URL: ${publicUrl}`);
@@ -102,6 +103,7 @@ async function uploadNextImageToPrintify() {
         title,
         description: "Auto-generated product from Supabase",
         blueprint_id: productId,
+        print_provider_id: providerId,
         variants: [
           {
             id: variantId,
