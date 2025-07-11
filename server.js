@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: fix Printify upload via URL by including required file_name field
+// Commit: add required x, y, scale, and angle fields for Printify print_area image placement
 
 import express from 'express';
 import cors from 'cors';
@@ -117,7 +117,11 @@ async function uploadNextImageToPrintify() {
                 position: "front",
                 images: [
                   {
-                    id: printifyImageId
+                    id: printifyImageId,
+                    x: 0,
+                    y: 0,
+                    scale: 1,
+                    angle: 0
                   }
                 ]
               }
