@@ -1,5 +1,5 @@
 // File: server.js
-// Commit: add missing print_provider_id to fix Printify product creation error
+// Commit: fetch print provider for blueprint dynamically to avoid 404 error on product creation
 
 import express from 'express';
 import cors from 'cors';
@@ -30,9 +30,31 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE || !PRINTIFY_API_KEY || !PRINTIFY_SH
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 const printifyApiKey = PRINTIFY_API_KEY.trim();
-const productId = 5;
-const variantId = 40156;
-const providerId = 1; // Printify Premium
+const productId = 5; // This remains static
+let providerId = null;
+let variantId = null;
+
+async function fetchProviderAndVariantForBlueprint(blueprintId) {
+  const providerRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers.json`, {
+    headers: { Authorization: `Bearer ${printifyApiKey}` }
+  });
+
+  if (!providerRes.ok) throw new Error(`Provider fetch failed: ${providerRes.statusText}`);
+  const providers = await providerRes.json();
+  const provider = providers?.[0];
+  if (!provider) throw new Error('No print providers found for blueprint');
+
+  const variantRes = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers/${provider.id}/variants.json`, {
+    headers: { Authorization: `Bearer ${printifyApiKey}` }
+  });
+
+  if (!variantRes.ok) throw new Error(`Variant fetch failed: ${variantRes.statusText}`);
+  const variants = await variantRes.json();
+  const variant = variants?.[0];
+  if (!variant) throw new Error('No variants found for blueprint/provider');
+
+  return { providerId: provider.id, variantId: variant.id };
+}
 
 async function uploadImageToPrintifyByUrl(publicUrl, fileName) {
   console.log(`🌐 Uploading to Printify via URL: ${publicUrl}`);
@@ -90,6 +112,13 @@ async function uploadNextImageToPrintify() {
 
     console.log(`⬇️  Supabase public image URL: ${imageUrl}`);
     const printifyImageId = await uploadImageToPrintifyByUrl(imageUrl, filename);
+
+    if (!providerId || !variantId) {
+      const result = await fetchProviderAndVariantForBlueprint(productId);
+      providerId = result.providerId;
+      variantId = result.variantId;
+      console.log(`📦 Selected provider: ${providerId}, variant: ${variantId}`);
+    }
 
     console.log(`📦 Creating product "${title}" with image_id: ${printifyImageId}`);
 
